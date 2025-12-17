@@ -14,9 +14,9 @@ struct Resultado {
 class Algoritmo {
 
     struct DestinoCache {
-        double lat_rad;
-        double lon_rad;
-        double cos_lat;
+        double lat;
+        double lon;
+        double cos_lat; // Útil para corregir la distorsión de la longitud
     };
 
     DestinoCache destino_cache;
@@ -28,7 +28,7 @@ public:
     Resultado busqueda(int nodo_origen, int nodo_destino, Grafo &grafo, bool heuristica);
 
 private:
-    inline int haversine(int nodo_origen, const Grafo &grafo);
+    inline int distancia_euclidea(int nodo_origen, const Grafo &grafo);
     void inicializar_destino(int nodo_destino, const Grafo &grafo);
 };
 

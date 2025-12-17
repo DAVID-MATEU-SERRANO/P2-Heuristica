@@ -9,18 +9,15 @@
 constexpr double PI = 3.14159265358979323846;
 constexpr double EARTH_R = 6371000.0;
 
-// --------------------------------------------------
-// Precalcular datos del destino (UNA SOLA VEZ)
-// --------------------------------------------------
 void Algoritmo::inicializar_destino(int nodo_destino, const Grafo &grafo) {
     const auto &n = grafo.get_nodos()[nodo_destino - 1];
 
-    double lat = n.lat / 1e6;
-    double lon = n.lon / 1e6;
-
-    destino_cache.lat_rad = lat * PI / 180.0;
-    destino_cache.lon_rad = lon * PI / 180.0;
-    destino_cache.cos_lat = std::cos(destino_cache.lat_rad);
+    // Convertimos a grados reales
+    destino_cache.lat = n.lat / 1e6;
+    destino_cache.lon = n.lon / 1e6;
+    
+    // El coseno de la latitud es necesario para escalar la longitud correctamente
+    destino_cache.cos_lat = std::cos(destino_cache.lat * PI / 180.0);
 
     destino_inicializado = true;
 }
@@ -42,7 +39,7 @@ Resultado Algoritmo::busqueda(int origen, int destino, Grafo &grafo, bool usa_h)
     // Insertamos el primer nodo en abierta
     int h_ini = 0;
     if (usa_h) {
-        h_ini = haversine(origen, grafo);
+        h_ini = distancia_euclidea(origen, grafo);
     }
     g_minimos[origen-1] =  0; // Iniciamos el valor de g del origen
     ElementoAbierta e = {origen, h_ini, 0};
@@ -93,7 +90,7 @@ Resultado Algoritmo::busqueda(int origen, int destino, Grafo &grafo, bool usa_h)
 
                 int h_v = 0;
                 if (usa_h) {
-                    h_v = haversine(v, grafo);
+                    h_v = distancia_euclidea(v, grafo);
                 }
 
                 hijo = {v, nuevo_g + h_v, nuevo_g};
@@ -106,29 +103,22 @@ Resultado Algoritmo::busqueda(int origen, int destino, Grafo &grafo, bool usa_h)
 }
 
 // --------------------------------------------------
-// Heurística Haversine (DESTINO FIJO)
+// Heurística Distancia Euclídea Proyectada
 // --------------------------------------------------
-inline int Algoritmo::haversine(int nodo_origen, const Grafo &grafo) {
-
+inline int Algoritmo::distancia_euclidea(int nodo_origen, const Grafo &grafo) {
     const auto &n = grafo.get_nodos()[nodo_origen - 1];
 
     double lat = n.lat / 1e6;
     double lon = n.lon / 1e6;
 
-    double lat_rad = lat * PI / 180.0;
-    double lon_rad = lon * PI / 180.0;
+    // Diferencia de latitud y longitud convertida a radianes
+    double dLat = (destino_cache.lat - lat) * (PI / 180.0);
+    double dLon = (destino_cache.lon - lon) * (PI / 180.0);
 
-    double dLat = destino_cache.lat_rad - lat_rad;
-    double dLon = destino_cache.lon_rad - lon_rad;
+    // Proyección simple: x es la longitud ajustada por el coseno de la latitud
+    double x = dLon * destino_cache.cos_lat;
+    double y = dLat;
 
-    double sin_dLat = std::sin(dLat * 0.5);
-    double sin_dLon = std::sin(dLon * 0.5);
-
-    double a = sin_dLat * sin_dLat +
-               std::cos(lat_rad) * destino_cache.cos_lat *
-               sin_dLon * sin_dLon;
-
-    double c = 2.0 * std::atan2(std::sqrt(a), std::sqrt(1.0 - a));
-
-    return static_cast<int>(EARTH_R * c);
+    // Pitágoras: Distancia = R * sqrt(x^2 + y^2)
+    return static_cast<int>(EARTH_R * std::sqrt(x * x + y * y));
 }
