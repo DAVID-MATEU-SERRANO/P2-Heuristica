@@ -4,15 +4,17 @@
 #include <vector>
 #include <list>
 
+// Estructura que representa un elemento de la lista abierta
 struct ElementoAbierta {
     int id;
-    int f;
-    int g;
+    int f; // f = g + h
+    int g; // g = coste acumulado
 };
 
+// Implementación de la lista abierta usando Dials bucket circular
 class Abierta {
     public:
-        // El modulo debe ser > max_coste_arista para Dijkstra
+        
         Abierta(int modulo) : modulo(modulo), num_elementos(0), current_min(-1) {
             buckets.resize(modulo);
         }
@@ -22,11 +24,10 @@ class Abierta {
         bool empty() const { return num_elementos == 0; }
 
     private:
-        // Usamos list o vector para los buckets
-        std::vector<std::list<ElementoAbierta>> buckets;
+        std::vector<std::vector<ElementoAbierta>> buckets; // Cada bucket tiene una lista de elementos (ya que puede ser que haya elementos con el mismo f)
         int modulo;
         int num_elementos;
-        int current_min; 
+        int current_min; // El valor mínimo de f en la lista abierta
 };
 
 #endif

@@ -2,43 +2,76 @@
 #include "abierta.hpp"
 #include "grafo.hpp"
 #include <algorithm>
-
-#include "algoritmo.hpp"
-#include "abierta.hpp"
-#include <algorithm>
 #include <limits>
 #include <vector>
 #include <cmath>
 
-/**
- * Ejecuta la búsqueda A* o Dijkstra y escribe el camino óptimo en 'out'.
- * Retorna el coste total (g) del camino, o -1 si no hay conexión.
- */
-Algoritmo::Resultado Algoritmo::busqueda(int origen, int destino, Grafo &grafo, bool usa_h) {
-    int n = grafo.num_nodos;
-    Abierta abierta(2 * grafo.max_cost + 1);
+constexpr double PI = 3.14159265358979323846;
+constexpr double EARTH_R = 6371000.0;
+
+// --------------------------------------------------
+// Precalcular datos del destino (UNA SOLA VEZ)
+// --------------------------------------------------
+void Algoritmo::inicializar_destino(int nodo_destino, const Grafo &grafo) {
+    const auto &n = grafo.get_nodos()[nodo_destino - 1];
+
+    double lat = n.lat / 1e6;
+    double lon = n.lon / 1e6;
+
+    destino_cache.lat_rad = lat * PI / 180.0;
+    destino_cache.lon_rad = lon * PI / 180.0;
+    destino_cache.cos_lat = std::cos(destino_cache.lat_rad);
+
+    destino_inicializado = true;
+}
+
+
+// Dependiendo del valor de usa_h, se ejecuta A* o Dijkstra (heurística == 0)
+Resultado Algoritmo::busqueda(int origen, int destino, Grafo &grafo, bool usa_h) {
+    if (usa_h && !destino_inicializado) {
+        inicializar_destino(destino, grafo);
+    }
+    // Inicializaciones importantes
+    int n = grafo.get_num_nodos();
+    Abierta abierta(2 * grafo.get_max_cost() + 1); // En la memoria queda explicado el por que de este módulo
     std::vector<bool> cerrada(n, false);
-    std::vector<int> g_minimos(n, std::numeric_limits<int>::max());
-    std::vector<int> padres(n, 0); // Usamos 0 para indicar sin padre (los IDs son 1..N)
-    int n_expansiones = 0;
+    std::vector<int> g_minimos(n, std::numeric_limits<int>::max()); // Se usará para ir actualizando los mejores valores de g
+    std::vector<int> padres(n, 0); // Se usa para reconstruir el camino de la solución
+    int n_expansiones = 0; // Para mostrarlo como información
     
-    int h_ini = usa_h ? haversine(origen, destino, grafo) : 0;
-    g_minimos[origen-1] =  0;
+    // Insertamos el primer nodo en abierta
+    int h_ini = 0;
+    if (usa_h) {
+        h_ini = haversine(origen, grafo);
+    }
+    g_minimos[origen-1] =  0; // Iniciamos el valor de g del origen
     ElementoAbierta e = {origen, h_ini, 0};
     abierta.insertar(e);
 
     ElementoAbierta actual, hijo;
-    while (!abierta.empty()) {
+
+    while (true) {
         actual = abierta.extraer_minimo();
-        if (cerrada[actual.id-1]) continue;
+        if (actual.id == -1) {
+            // Lista abierta vacía
+            break;
+        }
+
+        if (cerrada[actual.id-1]) continue; // Si el nodo ya está en cerrada, lo saltamos 
         
         n_expansiones++;
-        // 4. META ENCONTRADA
+        
+        // Meta encontrada
         if (actual.id == destino) {
             // Reconstrucción del camino mediante backtracking (hacia atrás)
-            std::vector<int> camino;
+            std::vector<std::pair<int, int>> camino; // En el camino guardamos el ID del nodo y el coste de la arista para llegar a él
             for (int v = destino; v != 0; v = padres[v-1]) {
-                camino.push_back(v);
+                int p = padres[v-1];
+                if (p != 0) {
+                    camino.push_back({v, grafo.get_coste_arista(p, v)});
+                } else {
+                    camino.push_back({v, 0}); // El origen no tiene arista de entrada
+                }
             }
             std::reverse(camino.begin(), camino.end());
 
@@ -47,54 +80,55 @@ Algoritmo::Resultado Algoritmo::busqueda(int origen, int destino, Grafo &grafo, 
 
         cerrada[actual.id-1] = true;
 
-        for (const auto& arista : grafo.nodos[actual.id-1].vecinos) {
+        for (const auto& arista : grafo.get_nodos()[actual.id-1].vecinos) {
             int v = arista.first;       // ID del vecino
-            int peso = arista.second;   // Peso de la arista (distancia real)
-            int nuevo_g = actual.g + peso;
+            if (cerrada[v-1]) continue; // Si el vecino ya está en cerrada, lo saltamos
+            int peso = arista.second;   // Peso de la arista 
+            int nuevo_g = actual.g + peso; // Coste acumulado
 
-            // RELAJACIÓN: ¿Es este camino mejor que el mejor encontrado antes?
+            // Si ya hemos encontrado un camino mejor, lo saltamos, nos ahorramos meterlo en la lista abierta
             if (nuevo_g < g_minimos[v-1]) {
                 g_minimos[v-1] = nuevo_g;
                 padres[v-1] = actual.id; // Guardamos el rastro localmente
 
-                int h_v = usa_h ? haversine(v, destino, grafo) : 0;
+                int h_v = 0;
+                if (usa_h) {
+                    h_v = haversine(v, grafo);
+                }
 
                 hijo = {v, nuevo_g + h_v, nuevo_g};
                 abierta.insertar(hijo);
             }
         }
     }
-
     // Si salimos del bucle sin encontrar el destino
     return Resultado{-1, {}, n_expansiones};
 }
 
-int Algoritmo::haversine(int nodo_origen, int nodo_destino, Grafo &grafo) {
-    // 1. Obtener coordenadas y convertir de millonésimas de grado a grados (double)
-    // El formato DIMACS es: v ID LON LAT
-    double lon1 = grafo.nodos[nodo_origen-1].lon / 1000000.0;
-    double lat1 = grafo.nodos[nodo_origen-1].lat / 1000000.0;
-    double lon2 = grafo.nodos[nodo_destino-1].lon / 1000000.0;
-    double lat2 = grafo.nodos[nodo_destino-1].lat / 1000000.0;
+// --------------------------------------------------
+// Heurística Haversine (DESTINO FIJO)
+// --------------------------------------------------
+inline int Algoritmo::haversine(int nodo_origen, const Grafo &grafo) {
 
-    // 2. Convertir grados a radianes
-    const double PI = 3.14159265358979323846;
-    double rad_lat1 = lat1 * PI / 180.0;
-    double rad_lat2 = lat2 * PI / 180.0;
-    double dLat = (lat2 - lat1) * PI / 180.0;
-    double dLon = (lon2 - lon1) * PI / 180.0;
+    const auto &n = grafo.get_nodos()[nodo_origen - 1];
 
-    // 3. Fórmula de Haversine
-    double a = std::sin(dLat / 2) * std::sin(dLat / 2) +
-               std::cos(rad_lat1) * std::cos(rad_lat2) *
-               std::sin(dLon / 2) * std::sin(dLon / 2);
-    
-    double c = 2 * std::atan2(std::sqrt(a), std::sqrt(1 - a));
+    double lat = n.lat / 1e6;
+    double lon = n.lon / 1e6;
 
-    // 4. Radio de la Tierra en metros
-    const double R = 6371000.0;
-    double distancia = R * c;
+    double lat_rad = lat * PI / 180.0;
+    double lon_rad = lon * PI / 180.0;
 
-    // 5. Retornar floor para mantener la admisibilidad en A*
-    return static_cast<int>(std::floor(distancia));
+    double dLat = destino_cache.lat_rad - lat_rad;
+    double dLon = destino_cache.lon_rad - lon_rad;
+
+    double sin_dLat = std::sin(dLat * 0.5);
+    double sin_dLon = std::sin(dLon * 0.5);
+
+    double a = sin_dLat * sin_dLat +
+               std::cos(lat_rad) * destino_cache.cos_lat *
+               sin_dLon * sin_dLon;
+
+    double c = 2.0 * std::atan2(std::sqrt(a), std::sqrt(1.0 - a));
+
+    return static_cast<int>(EARTH_R * c);
 }

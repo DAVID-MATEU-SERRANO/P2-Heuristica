@@ -1,31 +1,35 @@
 #include "abierta.hpp"
 
 void Abierta::insertar(ElementoAbierta elemento) {
-    // Si es el primer elemento, inicializamos current_min
-    if (num_elementos == 0 || elemento.f < current_min) {
+    // Se encarga de insertar un elemento en la lista abierta (debe insertarlo ordenado)
+    if (elemento.f < current_min || current_min == -1) {
+        // Si el elemento es menor que el mínimo actual, actualizamos el mínimo
         current_min = elemento.f;
     }
     
+    // Obtenemos el índice del bucket y lo insertamos
     int idx = elemento.f % modulo;
     buckets[idx].push_back(elemento);
     num_elementos++;
 }
 
 ElementoAbierta Abierta::extraer_minimo() {
+    // Lista abierta vacía
     if (num_elementos == 0) {
         return {-1, -1, -1};
     }
+    // Calculamos el índice del bucket con el mínimo
     int idx = current_min % modulo;
 
-    // Buscamos el siguiente bucket con contenido
+    // Si resulta que el bucker está vacío, buscamos el siguiente con contenido (este será en nuevo mínimo)
     while (buckets[idx].empty()) {
         current_min++;
         idx = current_min % modulo;
     }
 
-    // Extraemos usando la eficiencia de deque
-    ElementoAbierta res = buckets[idx].front();
-    buckets[idx].pop_front();
+    // Una vez tenemos el bucket con el mínimo, extraemos el primer elemento
+    ElementoAbierta res = buckets[idx].back();
+    buckets[idx].pop_back();
     num_elementos--;
     
     return res;

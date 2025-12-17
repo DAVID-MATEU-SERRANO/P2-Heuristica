@@ -1,24 +1,34 @@
-#ifndef CERRADA_HPP
-#define CERRADA_HPP
+#ifndef ALGORITMO_HPP
+#define ALGORITMO_HPP
 
+#include "grafo.hpp"
 #include <vector>
 
-class Cerrada {
-    public:
-        Cerrada(int n_nodos) {
-           cerrada.resize(n_nodos, false);
-        }   
+struct Resultado {
+    int coste_total;
+    std::vector<std::pair<int, int>> camino;
+    int nodos_expandidos;
+};
 
-        void insertar(int nodo) {
-            cerrada[nodo-1] = true;
-        }
+class Algoritmo {
 
-        bool contiene(int nodo) {
-            return cerrada[nodo-1];
-        }
+    struct DestinoCache {
+        double lat_rad;
+        double lon_rad;
+        double cos_lat;
+    };
 
-    private:
-        std::vector<bool> cerrada;
+    DestinoCache destino_cache;
+    bool destino_inicializado = false;
+
+public:
+    Algoritmo() {}
+
+    Resultado busqueda(int nodo_origen, int nodo_destino, Grafo &grafo, bool heuristica);
+
+private:
+    void inicializar_destino(int nodo_destino, const Grafo &grafo);
+    inline int haversine(int nodo_origen, const Grafo &grafo);
 };
 
 #endif
