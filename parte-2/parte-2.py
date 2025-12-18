@@ -26,14 +26,12 @@ def main():
         return
 
     # Compilar el c++
-    try:
-        subprocess.run([
+    subprocess.run([
                 "g++", "-O3", "-std=c++17",
                 "main.cpp", "grafo.cpp", "abierta.cpp", "algoritmo.cpp",
                 "-o", "search"
             ], check=True)
-    except subprocess.CalledProcessError:
-        return
+
 
     # Ejecutar el c++
     try:

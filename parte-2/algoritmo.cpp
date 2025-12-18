@@ -11,6 +11,7 @@
 
 // Constantes para el calculo de la heurística
 const double EARTH_R = 6371000.0;
+const double GRAD_TO_RAD = M_PI / 180.0; // Lo dejamos precalculado para que vaya más rápido
 
 // Se precalculan los datos del destino para calcular la heurística (ya que como el destino es siempre el mismo, no los tenemos que calcular siempre)
 void Algoritmo::inicializar_destino(int nodo_destino, const Grafo &grafo) {
@@ -21,7 +22,7 @@ void Algoritmo::inicializar_destino(int nodo_destino, const Grafo &grafo) {
     destino_cache.lon = n.lon / 1e6;
     
     // El coseno de la latitud es necesario para escalar la longitud correctamente
-    destino_cache.cos_lat = std::cos(destino_cache.lat * M_PI / 180.0);
+    destino_cache.cos_lat = std::cos(destino_cache.lat * GRAD_TO_RAD);
 
     destino_inicializado = true;
 }
@@ -118,8 +119,8 @@ inline int Algoritmo::distancia_euclidea(int nodo_origen, const Grafo &grafo) {
     double lon = n.lon / 1e6;
 
     // Diferencia de latitud y longitud convertida a radianes
-    double dLat = (destino_cache.lat - lat) * (M_PI / 180.0);
-    double dLon = (destino_cache.lon - lon) * (M_PI / 180.0);
+    double dLat = (destino_cache.lat - lat) * GRAD_TO_RAD;
+    double dLon = (destino_cache.lon - lon) * GRAD_TO_RAD;
 
     // X es la longitud ajustada por el coseno de la latitud
     double x = dLon * destino_cache.cos_lat;
