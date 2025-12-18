@@ -20,22 +20,33 @@ def main():
     distancias = os.path.abspath(args.mapa + ".gr")
     output_file = os.path.abspath(args.output_file)
 
-    if os.path.exists(coordenadas) and os.path.exists(distancias):
-        # Compilar el c++ solo si no existe el ejecutable search
-        if not os.path.exists("./search"):
-            subprocess.run([
+    # Comprobamos las rutas antes de hacer nada
+    if not os.path.exists(coordenadas) or not os.path.exists(distancias):
+        print("Error: No se ha podido acceder a los archivos del grafo")
+        return
+
+    # Compilar el c++
+    try:
+        subprocess.run([
                 "g++", "-O3", "-std=c++17",
                 "main.cpp", "grafo.cpp", "abierta.cpp", "algoritmo.cpp",
                 "-o", "search"
             ], check=True)
+    except subprocess.CalledProcessError:
+        return
 
-        # Ejecutar el c++
+    # Ejecutar el c++
+    try:
         subprocess.run([
             "./search", str(nodo_origen), str(nodo_destino), coordenadas, distancias, output_file
         ], check=True)
+    except subprocess.CalledProcessError:
+        # El programa C++ ya ha informado del error, no tenemos que mostrar nada más
+        return
 
-    else:
-        print("Error: No se ha podido acceder a los archivos del grafo")
+    # Eliminar el ejecutable después de la ejecución (para que en cada ejecución, se haga todo desde 0)
+    if os.path.exists("search"):
+        os.remove("search")
 
 if __name__ == "__main__":
     main()

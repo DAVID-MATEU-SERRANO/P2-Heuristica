@@ -2,7 +2,6 @@
 #define ABIERTA_HPP
 
 #include <vector>
-#include <list>
 
 // Estructura que representa un elemento de la lista abierta
 struct ElementoAbierta {

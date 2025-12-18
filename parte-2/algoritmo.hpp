@@ -11,16 +11,15 @@ struct Resultado {
     int nodos_expandidos;
 };
 
+// Estructura para guardar lo precalculado respecto al destino
+struct DestinoCache {
+    double lat;
+    double lon;
+    double cos_lat; 
+    
+};
+
 class Algoritmo {
-
-    struct DestinoCache {
-        double lat;
-        double lon;
-        double cos_lat; // Útil para corregir la distorsión de la longitud
-    };
-
-    DestinoCache destino_cache;
-    bool destino_inicializado = false;
 
 public:
     Algoritmo() {}
@@ -30,6 +29,8 @@ public:
 private:
     inline int distancia_euclidea(int nodo_origen, const Grafo &grafo);
     void inicializar_destino(int nodo_destino, const Grafo &grafo);
+    DestinoCache destino_cache;
+    bool destino_inicializado = false;
 };
 
 #endif

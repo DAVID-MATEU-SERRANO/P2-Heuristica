@@ -1,14 +1,18 @@
 #include "algoritmo.hpp"
 #include "abierta.hpp"
 #include "grafo.hpp"
+#include "cerrada.hpp"
 #include <algorithm>
 #include <limits>
 #include <vector>
 #include <cmath>
+#include <iostream>
+#define _USE_MATH_DEFINES
 
-constexpr double PI = 3.14159265358979323846;
-constexpr double EARTH_R = 6371000.0;
+// Constantes para el calculo de la heurística
+const double EARTH_R = 6371000.0;
 
+// Se precalculan los datos del destino para calcular la heurística (ya que como el destino es siempre el mismo, no los tenemos que calcular siempre)
 void Algoritmo::inicializar_destino(int nodo_destino, const Grafo &grafo) {
     const auto &n = grafo.get_nodos()[nodo_destino - 1];
 
@@ -17,7 +21,7 @@ void Algoritmo::inicializar_destino(int nodo_destino, const Grafo &grafo) {
     destino_cache.lon = n.lon / 1e6;
     
     // El coseno de la latitud es necesario para escalar la longitud correctamente
-    destino_cache.cos_lat = std::cos(destino_cache.lat * PI / 180.0);
+    destino_cache.cos_lat = std::cos(destino_cache.lat * M_PI / 180.0);
 
     destino_inicializado = true;
 }
@@ -25,13 +29,15 @@ void Algoritmo::inicializar_destino(int nodo_destino, const Grafo &grafo) {
 
 // Dependiendo del valor de usa_h, se ejecuta A* o Dijkstra (heurística == 0)
 Resultado Algoritmo::busqueda(int origen, int destino, Grafo &grafo, bool usa_h) {
+
+    // Solamente precalculamos los datos necesarios para calcular la heurística la primera vez que se llama a la función
     if (usa_h && !destino_inicializado) {
         inicializar_destino(destino, grafo);
     }
     // Inicializaciones importantes
     int n = grafo.get_num_nodos();
     Abierta abierta(2 * grafo.get_max_cost() + 1); // En la memoria queda explicado el por que de este módulo
-    std::vector<bool> cerrada(n, false);
+    Cerrada cerrada(n);
     std::vector<int> g_minimos(n, std::numeric_limits<int>::max()); // Se usará para ir actualizando los mejores valores de g
     std::vector<int> padres(n, 0); // Se usa para reconstruir el camino de la solución
     int n_expansiones = 0; // Para mostrarlo como información
@@ -54,7 +60,7 @@ Resultado Algoritmo::busqueda(int origen, int destino, Grafo &grafo, bool usa_h)
             break;
         }
 
-        if (cerrada[actual.id-1]) continue; // Si el nodo ya está en cerrada, lo saltamos 
+        if (cerrada.contiene(actual.id)) continue; // Si el nodo ya está en cerrada, lo saltamos 
         
         n_expansiones++;
         
@@ -75,11 +81,11 @@ Resultado Algoritmo::busqueda(int origen, int destino, Grafo &grafo, bool usa_h)
             return Resultado{actual.g, camino, n_expansiones};
         }
 
-        cerrada[actual.id-1] = true;
+        cerrada.insertar(actual.id);
 
         for (const auto& arista : grafo.get_nodos()[actual.id-1].vecinos) {
             int v = arista.first;       // ID del vecino
-            if (cerrada[v-1]) continue; // Si el vecino ya está en cerrada, lo saltamos
+            if (cerrada.contiene(v)) continue; // Si el vecino ya está en cerrada, lo saltamos
             int peso = arista.second;   // Peso de la arista 
             int nuevo_g = actual.g + peso; // Coste acumulado
 
@@ -112,13 +118,13 @@ inline int Algoritmo::distancia_euclidea(int nodo_origen, const Grafo &grafo) {
     double lon = n.lon / 1e6;
 
     // Diferencia de latitud y longitud convertida a radianes
-    double dLat = (destino_cache.lat - lat) * (PI / 180.0);
-    double dLon = (destino_cache.lon - lon) * (PI / 180.0);
+    double dLat = (destino_cache.lat - lat) * (M_PI / 180.0);
+    double dLon = (destino_cache.lon - lon) * (M_PI / 180.0);
 
-    // Proyección simple: x es la longitud ajustada por el coseno de la latitud
+    // X es la longitud ajustada por el coseno de la latitud
     double x = dLon * destino_cache.cos_lat;
     double y = dLat;
 
-    // Pitágoras: Distancia = R * sqrt(x^2 + y^2)
-    return static_cast<int>(EARTH_R * std::sqrt(x * x + y * y));
+    // Aplicamos pitagoras para obtener la distancia = R * sqrt(x^2 + y^2)
+    return static_cast<int>(EARTH_R * std::sqrt(x * x + y * y)); // Redondeamos para que la heurística devuelva un entero
 }
